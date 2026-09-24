@@ -1,5 +1,5 @@
-import { getChatGPTUser } from '@/app/chatgpt-auth';
-import { AppError, getState, seed, saveWebinar, updateLead, simulateInvitations } from '@/lib/server';
+import { getAdminUser } from '@/lib/auth';
+import { AppError, getState, ensureWorkspace, saveWebinar, updateLead, simulateInvitations } from '@/lib/server';
 import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -7,16 +7,17 @@ function failure(e: unknown) { if (e instanceof AppError)
     return json({ error: e.message }, e.status); if (e instanceof z.ZodError)
     return json({ error: e.issues[0]?.message || 'Check the form fields.' }, 400); console.error('Desk request failed', e); return json({ error: 'Could not save or load your workspace. Please try again.' }, 503); }
 export async function GET() { try {
-    const u = await getChatGPTUser();
+    const u = await getAdminUser();
     if (!u)
         return json({ error: 'Please sign in.' }, 401);
+    await ensureWorkspace(u.userId);
     return json(await getState(u.userId));
 }
 catch (e) {
     return failure(e);
 } }
 export async function POST(request: Request) { try {
-    const u = await getChatGPTUser();
+    const u = await getAdminUser();
     if (!u)
         return json({ error: 'Please sign in.' }, 401);
     const origin = request.headers.get('origin');
@@ -28,7 +29,7 @@ export async function POST(request: Request) { try {
     let result: unknown = null;
     switch (b.action) {
         case 'initialize':
-            await seed(u.userId);
+            await ensureWorkspace(u.userId);
             break;
         case 'save_webinar':
             result = await saveWebinar(u.userId, b.webinar, typeof b.id === 'string' ? b.id : undefined);

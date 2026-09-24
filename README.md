@@ -11,15 +11,15 @@ A mobile-first, persistent MVP for recurring webinar registrations and course fo
 - One contact per normalized phone per workspace, separate registrations for each webinar, and historical notes across batches.
 - Dated follow-ups in India Standard Time, notes, outcomes, optional attendance, and contact-wide outreach suppression.
 - Individual invitation previews triggered in one selected batch. The database prevents duplicate simulated invitations even if two triggers run concurrently.
-- Sample contacts are clearly identified; calling and manual WhatsApp actions are disabled for fictional numbers.
+- Workspaces start empty. You create webinars and collect registrations yourself.
 - Network-only installable app shell. No contact data or authenticated pages are cached offline.
 - Private authenticated workspace with server-side user scoping on every admin operation.
 
 ## Demo boundaries
 
-The initial workspace is seeded once per authenticated user with four fictional people and three webinars. Registrations and notes entered afterward are saved in D1.
+Each authenticated user gets an empty workspace. Webinars, registrations, and notes you add afterward are saved in D1. Previously generated sample webinars and fictional contacts are removed on the next workspace load.
 
-The invitation action creates `Simulated` message records. It does **not** send a message, create a WhatsApp delivery receipt, or contact any external account. Sample webinar joining URLs are examples, not scheduled meetings.
+The invitation action creates `Simulated` message records. It does **not** send a message, create a WhatsApp delivery receipt, or contact any external account. Joining URLs you enter should be real meeting links for your batch.
 
 The deployed Site is owner-private. Although registration routes do not require application sign-in, the hosting access policy still restricts all visitors. The owner can preview forms now; outside participants cannot access them until the hosting audience is deliberately changed. Admin data remains scoped by authenticated user even if the site is later made public. A client collaboration/role model is not implemented.
 
@@ -38,7 +38,7 @@ npm run dev
 
 Apply that initial migration only once. Additional schema changes use `npm run db:generate`; retain applied migration history and apply new files in order.
 
-Local sign-in uses the starter's loopback-only simulator at `/signin-with-chatgpt?return_to=/`. The hosted build uses platform authentication. The local simulator is not a production login bypass.
+Sign-in is a single shared admin account: a password (`ADMIN_PASSWORD`) checked against a signed, HttpOnly session cookie (`SESSION_SECRET`). Set both as local secrets (e.g. in `.dev.vars`, which Wrangler loads automatically and which stays out of git) before running `npm run dev`, then sign in at `/signin`. There is no self-serve signup and no other account tier — this app is built for exactly one operator.
 
 ## Validation
 
@@ -65,6 +65,14 @@ Checks cover browser flows, phone layout, history, authenticated API access, dup
 
 Schema is in `db/schema.ts`; generated migrations are in `drizzle/`. Runtime code uses prepared D1 statements through `lib/database.ts`. Multi-record registration and follow-up updates use transactional batches. Public endpoints return no contact records, notes, owner IDs, or meeting URLs.
 
-D1 persistence is provisioned by Sites. There is no separate backup-export interface or scheduled application backup job in this MVP; confirm platform recovery and retention requirements before collecting production participant data. Users requesting correction or deletion should contact the organizer; an operator-facing deletion workflow can be added before a public pilot.
+D1 has ~30 days of built-in point-in-time recovery, but there is no separate backup-export job in this MVP; run `wrangler d1 export DB --remote --output backup.sql` periodically (e.g. from cron) before relying on this for real participant data. Users requesting correction or deletion should contact the organizer; an operator-facing deletion workflow can be added before a public pilot.
 
-Only the exact owner-private deployment is authorized by the current build. Use Sites hosting tools for source publication and environment management.
+## Deploying your own instance
+
+This runs as a Cloudflare Worker with a D1 database, in your own Cloudflare account — not through any third-party hosting layer.
+
+1. `wrangler d1 create seminar-desk-db` and note the returned database id.
+2. Apply migrations to it: `wrangler d1 execute DB --remote --database-id <id> --file drizzle/0000_parched_purple_man.sql` (and any later files `npm run db:generate` produces, in order).
+3. Set two Worker secrets: `wrangler secret put ADMIN_PASSWORD` and `wrangler secret put SESSION_SECRET` (a long random string for the second one, e.g. `openssl rand -hex 32`).
+4. Build with `D1_DATABASE_ID=<id> npm run build`, then `wrangler deploy` (pointing at the built worker's generated config, or your own `wrangler.toml` with the same `DB` binding).
+5. Visit your `*.workers.dev` URL (or a custom domain you attach in the Cloudflare dashboard) and sign in at `/signin` with the password from step 3. The app is installable from there on any phone or desktop browser (Add to Home Screen) — no separate app build is needed.

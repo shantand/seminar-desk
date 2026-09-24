@@ -17,28 +17,78 @@ export async function getState(owner: string) {
     ]);
     return { webinars: w.results, leads: l.results, activities: a.results, messages: m.results, mode: 'demo' as const };
 }
-export async function seed(owner: string) {
+export async function ensureWorkspace(owner: string) {
     const db = database();
-    if (await db.prepare('SELECT owner FROM workspaces WHERE owner=?').bind(owner).first())
-        return;
+    const existing = await db.prepare('SELECT owner FROM workspaces WHERE owner=?').bind(owner).first();
+    const stmts = [db.prepare('INSERT OR IGNORE INTO workspaces(owner,created_at) VALUES(?,?)').bind(owner, iso())];
+    if (!existing)
+        stmts.push(...(await seedWebinars(owner)));
+    stmts.push(
+        db.prepare(`DELETE FROM messages WHERE registration_id IN (SELECT r.id FROM registrations r JOIN webinars w ON w.id=r.webinar_id WHERE w.owner=? AND (w.sample=1 OR EXISTS(SELECT 1 FROM contacts c WHERE c.id=r.contact_id AND c.sample=1)))`).bind(owner),
+        db.prepare(`DELETE FROM activities WHERE registration_id IN (SELECT r.id FROM registrations r JOIN webinars w ON w.id=r.webinar_id WHERE w.owner=? AND (w.sample=1 OR EXISTS(SELECT 1 FROM contacts c WHERE c.id=r.contact_id AND c.sample=1)))`).bind(owner),
+        db.prepare(`DELETE FROM registrations WHERE webinar_id IN (SELECT id FROM webinars WHERE owner=? AND sample=1) OR contact_id IN (SELECT id FROM contacts WHERE owner=? AND sample=1)`).bind(owner, owner),
+        db.prepare('DELETE FROM contacts WHERE owner=? AND sample=1').bind(owner),
+        db.prepare('DELETE FROM webinars WHERE owner=? AND sample=1').bind(owner)
+    );
+    await db.batch(stmts);
+}
+// One-time starter content for a brand-new workspace: two free intro webinars for
+// CataLife Training Organization programs (catalife.org), in the org's usual WhatsApp
+// promo format. Regular (non-sample) rows, so editing or deleting them is permanent —
+// they are not recreated on a later load.
+async function seedWebinars(owner: string) {
+    const db = database();
     const prefix = (await hash(owner)).slice(0, 20);
     const id = (s: string) => `${prefix}-${s}`;
-    const now = iso();
-    const future = (days: number, hour = 12) => { const d = new Date(); d.setUTCDate(d.getUTCDate() + days); d.setUTCHours(hour, 30, 0, 0); return d.toISOString(); };
-    const ws = [{ id: id('webinar-1'), title: 'Your first step into digital marketing', course: 'Digital Marketing', batch: 'Next weekend batch', description: 'Explore the skills behind successful digital campaigns. Get a practical introduction to social media, search, and the projects you can build for your portfolio.', starts: future(4), status: 'open' }, { id: id('webinar-2'), title: 'Build a career with data', course: 'Data Analytics', batch: 'Next evening batch', description: 'Discover how spreadsheets, SQL, and visual storytelling turn data into decisions. Find out what to learn first and how to demonstrate your skills.', starts: future(8), status: 'open' }, { id: id('webinar-3'), title: 'Digital marketing: career essentials', course: 'Digital Marketing', batch: 'Previous batch', description: 'An introduction to practical digital marketing skills and career pathways for students and recent graduates.', starts: future(-40), status: 'closed' }];
-    const rows = [{ name: 'Priya Sharma', situation: SITUATIONS[1], college: 'Fergusson College', study: 'B.Com graduate', goal: 'Certification and practical experience for my first job.', status: 'Interested', next: future(0), note: 'Interested in a weekend batch. Wants to discuss certification.', w: 0 }, { name: 'Arjun Mehta', situation: SITUATIONS[0], college: 'Modern College', study: 'Final year · B.Sc', goal: 'Build a portfolio of data projects.', status: 'Follow-up required', next: future(-1, 11), note: 'Asked about practical projects. Call back to discuss the schedule.', w: 1 }, { name: 'Sneha Patel', situation: SITUATIONS[2], college: '', study: 'Marketing associate', goal: 'Improve my digital campaign skills.', status: 'Follow-up required', next: future(0, 13), note: 'Requested a callback after work about course timings.', w: 0 }, { name: 'Rahul Joshi', situation: SITUATIONS[1], college: 'SP College', study: 'B.Sc graduate', goal: 'Understand entry-level analyst roles.', status: 'Not contacted', next: null, note: 'Registered for the upcoming webinar.', w: 1 }];
-    const stmts = [db.prepare('INSERT OR IGNORE INTO workspaces(owner,created_at) VALUES(?,?)').bind(owner, now)];
-    for (const w of ws)
-        stmts.push(db.prepare('INSERT OR IGNORE INTO webinars(id,owner,title,course,batch,description,organizer,starts_at,closes_at,join_url,status,created_at,sample) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1)').bind(w.id, owner, w.title, w.course, w.batch, w.description, 'Seminar Desk Academy', w.starts, w.starts, 'https://meet.google.com/example-demo', w.status, now));
-    for (const [i, r] of rows.entries()) {
-        const cid = id(`contact-${i}`), rid = id(`registration-${i}`);
-        stmts.push(db.prepare('INSERT OR IGNORE INTO contacts(id,owner,phone,name,sample,created_at) VALUES(?,?,?,?,1,?)').bind(cid, owner, `+1000000000${i + 1}`, r.name, now));
-        stmts.push(db.prepare('INSERT OR IGNORE INTO registrations(id,webinar_id,contact_id,name,situation,college,study,goal,webinar_consent,followup_consent,consent_text,consent_at,status,next_at,attendance,created_at) VALUES(?,?,?,?,?,?,?,?,1,1,?,?,?,?,?,?)').bind(rid, ws[r.w].id, cid, r.name, r.situation, r.college, r.study, r.goal, 'Fictional demo consent; not permission to contact a real person.', now, r.status, r.next, 'Unknown', now));
-        stmts.push(db.prepare('INSERT OR IGNORE INTO activities(id,registration_id,text,outcome,created_at) VALUES(?,?,?,?,?)').bind(id(`activity-${i}`), rid, r.note, 'Sample conversation', now));
-    }
-    stmts.push(db.prepare('INSERT OR IGNORE INTO registrations(id,webinar_id,contact_id,name,situation,college,study,goal,webinar_consent,followup_consent,consent_text,consent_at,status,attendance,created_at) VALUES(?,?,?,?,?,?,?,?,1,1,?,?,?,?,?)').bind(id('registration-history'), ws[2].id, id('contact-0'), 'Priya Sharma', SITUATIONS[0], 'Fergusson College', 'Final year · B.Com', 'Explore marketing careers.', 'Fictional demo consent.', future(-41), 'Not interested in this batch', 'Attended', future(-41)));
-    stmts.push(db.prepare('INSERT OR IGNORE INTO activities(id,registration_id,text,outcome,created_at) VALUES(?,?,?,?,?)').bind(id('activity-history'), id('registration-history'), 'Exams overlap with this batch. Would like to revisit after graduation.', 'Not interested in this batch', future(-39)));
-    await db.batch(stmts);
+    const organizer = 'CataLife Training Organization';
+    const contact = '📞 Contact: 8483844076';
+    const webinars = [
+        {
+            key: 'webinar-python',
+            title: 'Master Python – Basic & Advance',
+            course: 'Programming',
+            batch: 'Free Webinar Batch',
+            description: `📢 Python for Beginners Week 2K26 – Free Webinar!
+
+Theme: From Zero to Job-Ready – Build Your Python Foundation for a Data-Driven Career.
+
+🗓️ Date: 4th October 2026
+⏰ Time: 7:00 PM onwards
+💻 Mode: Live & Free (link shared upon registration)
+
+🎓 Certificate: E-certificate provided to all attendees
+
+A preview of our Python – Basic & Advance program: variables, control statements, functions, data structures, OOPs, exception handling, SQLite connectivity, and real-world mini projects.
+
+Organized by ${organizer}
+${contact}`,
+            starts: new Date(Date.UTC(2026, 9, 4, 13, 30, 0)).toISOString(),
+            join_url: 'https://meet.google.com/python-webinar-oct'
+        },
+        {
+            key: 'webinar-cdm',
+            title: 'Advance Diploma in Clinical Data Management',
+            course: 'Data Management',
+            batch: 'Free Webinar Batch',
+            description: `📢 Clinical Data Management Week 2K26 – Free Webinar!
+
+Theme: Building Careers in Clinical Data Management – CRFs, EDC & GCP Essentials for Data Professionals.
+
+🗓️ Date: 11th October 2026
+⏰ Time: 7:00 PM onwards
+💻 Mode: Live & Free (link shared upon registration)
+
+🎓 Certificate: E-certificate provided to all attendees
+
+A preview of our Advance Diploma in Clinical Data Management: data collection, validation, and management in clinical trials, covering CRF/eCRF, EDC, data validation, GCP, and ALCOA+ principles.
+
+Organized by ${organizer}
+${contact}`,
+            starts: new Date(Date.UTC(2026, 9, 11, 13, 30, 0)).toISOString(),
+            join_url: 'https://meet.google.com/cdm-webinar-oct'
+        }
+    ];
+    return webinars.map(w => db.prepare('INSERT OR IGNORE INTO webinars(id,owner,title,course,batch,description,organizer,starts_at,closes_at,join_url,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(id(w.key), owner, w.title, w.course, w.batch, w.description, organizer, w.starts, w.starts, w.join_url, 'open', iso()));
 }
 export async function ownedWebinar(owner: string, id: string) { const w = await database().prepare('SELECT * FROM webinars WHERE id=? AND owner=?').bind(id, owner).first<Webinar>(); if (!w)
     throw new AppError('Webinar not found.', 404); return w; }

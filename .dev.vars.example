@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development (Wrangler loads this automatically).
+# Never commit the real .dev.vars file.
+ADMIN_PASSWORD=change-me
+SESSION_SECRET=generate-with-openssl-rand-hex-32
