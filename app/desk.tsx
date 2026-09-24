@@ -13,7 +13,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { Toaster } from '@/components/ui/sonner';
 import { toast } from 'sonner';
 import { type DeskState, type Webinar, type Lead, STATUSES, ATTENDANCE, formatDate, dayKey, monthKey, monthLabel, inputDate, fromInput, initials, isActive, invitation } from '@/lib/types';
-import { downloadFlyer } from '@/lib/flyer';
+import { downloadFlyer, FLYER_COLORS } from '@/lib/flyer';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 const empty: DeskState = { webinars: [], leads: [], activities: [], messages: [], mode: 'demo', whatsapp_configured: false };
 type Mutation = (body: Record<string, unknown>) => Promise<unknown>;
 function Choice({ value, onChange, items, label }: {
@@ -43,6 +44,7 @@ function WebinarRow({ webinar: w, leadCount, eligibleCount, openPeople, setInvit
 }) {
     const ended = w.status === 'open' && new Date(w.closes_at) < new Date();
     const [deleting, setDeleting] = useState(false);
+    const [flyerColor, setFlyerColor] = useState<string>(FLYER_COLORS[0]);
     async function remove() { setDeleting(true); try {
         await mutate({ action: 'delete_webinar', id: w.id });
         toast.success('Webinar deleted.');
@@ -59,13 +61,13 @@ function WebinarRow({ webinar: w, leadCount, eligibleCount, openPeople, setInvit
     }
     catch {
         toast.error('Copy unavailable. Open the form and copy its address.');
-    } }}><Link2 size={16}/></button><CollapsibleTrigger asChild><button className="icon-button row-toggle" aria-label={`More details for ${w.title}`}><ChevronDown size={16}/></button></CollapsibleTrigger></div></div><CollapsibleContent className="webinar-row-details"><div className="webinar-row-meta"><span className="course-label">{w.course}</span><span className={'status ' + (w.status === 'open' ? 'interested' : w.status === 'draft' ? 'followup' : 'closed')}>{ended ? 'Registration ended' : w.status[0].toUpperCase() + w.status.slice(1)}</span><span><GraduationCap size={14}/>{w.batch}</span></div><p className="webinar-description">{w.description}</p><div className="webinar-row-footer"><button className="registration-count" onClick={() => openPeople(w)}><span><Users size={17}/><strong>{leadCount}</strong> registered</span><span>View people<ArrowRight size={15}/></span></button><Button variant="outline" onClick={async () => { try {
-        await downloadFlyer(w);
+    } }}><Link2 size={16}/></button><CollapsibleTrigger asChild><button className="icon-button row-toggle" aria-label={`More details for ${w.title}`}><ChevronDown size={16}/></button></CollapsibleTrigger></div></div><CollapsibleContent className="webinar-row-details"><div className="webinar-row-meta"><span className="course-label">{w.course}</span><span className={'status ' + (w.status === 'open' ? 'interested' : w.status === 'draft' ? 'followup' : 'closed')}>{ended ? 'Registration ended' : w.status[0].toUpperCase() + w.status.slice(1)}</span><span><GraduationCap size={14}/>{w.batch}</span></div><p className="webinar-description">{w.description}</p><div className="webinar-row-footer"><button className="registration-count" onClick={() => openPeople(w)}><span><Users size={17}/><strong>{leadCount}</strong> registered</span><span>View people<ArrowRight size={15}/></span></button><Popover><PopoverTrigger asChild><Button variant="outline" aria-label={`Download a shareable flyer for ${w.title}`}><ImageIcon size={16}/>Flyer</Button></PopoverTrigger><PopoverContent className="flyer-popover"><p className="flyer-popover-label">Flyer color</p><div className="flyer-swatches">{FLYER_COLORS.map(c => <button key={c} type="button" className={'flyer-swatch' + (flyerColor === c ? ' active' : '')} style={{ background: c }} aria-label={`Use ${c} as the flyer background`} onClick={() => setFlyerColor(c)}/>)}<label className="flyer-swatch flyer-swatch-custom" style={{ background: flyerColor }} aria-label="Pick a custom flyer color"><input type="color" value={flyerColor} onChange={e => setFlyerColor(e.target.value)}/></label></div><Button className="primary-button flyer-download" onClick={async () => { try {
+        await downloadFlyer(w, flyerColor);
         toast.success('Flyer downloaded.');
     }
     catch {
         toast.error('Could not generate the flyer. Try again.');
-    } }} aria-label={`Download a shareable flyer for ${w.title}`}><ImageIcon size={16}/>Flyer</Button><Button variant="outline" onClick={() => setEditor({ webinar: w })} aria-label={`Edit ${w.title}`}><Settings2 size={16}/>Edit</Button><AlertDialog><AlertDialogTrigger asChild><Button variant="outline" className="danger-button" aria-label={`Delete ${w.title}`}><Trash2 size={16}/>Delete</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this webinar?</AlertDialogTitle><AlertDialogDescription>This permanently removes “{w.title}” along with all {leadCount} registration{leadCount === 1 ? '' : 's'} and their conversation history. This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel><AlertDialogAction className="danger-button" disabled={deleting} onClick={remove}>{deleting ? <LoaderCircle className="spin" size={16}/> : <Trash2 size={16}/>}Delete permanently</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div></CollapsibleContent></Collapsible>;
+    } }}><ImageIcon size={16}/>Download flyer</Button></PopoverContent></Popover><Button variant="outline" onClick={() => setEditor({ webinar: w })} aria-label={`Edit ${w.title}`}><Settings2 size={16}/>Edit</Button><AlertDialog><AlertDialogTrigger asChild><Button variant="outline" className="danger-button" aria-label={`Delete ${w.title}`}><Trash2 size={16}/>Delete</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete this webinar?</AlertDialogTitle><AlertDialogDescription>This permanently removes “{w.title}” along with all {leadCount} registration{leadCount === 1 ? '' : 's'} and their conversation history. This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel><AlertDialogAction className="danger-button" disabled={deleting} onClick={remove}>{deleting ? <LoaderCircle className="spin" size={16}/> : <Trash2 size={16}/>}Delete permanently</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></div></CollapsibleContent></Collapsible>;
 }
 export default function Desk({ displayName = 'Your workspace' }: {
     displayName?: string;
