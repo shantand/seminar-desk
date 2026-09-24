@@ -145,7 +145,7 @@ function WebinarEditor({ initial, duplicate, mutate, close, done }: {
     close: () => void;
     done: () => void;
 }) {
-    const [form, setForm] = useState({ title: initial?.title || '', course: initial?.course || '', batch: duplicate ? '' : initial?.batch || '', description: initial?.description || '', organizer: initial?.organizer || 'Seminar Desk Academy', starts_at: !duplicate && initial ? inputDate(initial.starts_at) : '', closes_at: !duplicate && initial ? inputDate(initial.closes_at) : '', join_url: duplicate ? '' : initial?.join_url || '', status: duplicate ? 'draft' : initial?.status || 'draft' });
+    const [form, setForm] = useState({ title: initial?.title || '', course: initial?.course || '', batch: duplicate ? '' : initial?.batch || '', description: initial?.description || '', organizer: initial?.organizer || 'Seminar Desk Academy', starts_at: !duplicate && initial ? inputDate(initial.starts_at) : '', closes_at: !duplicate && initial ? inputDate(initial.closes_at) : '', join_url: initial?.join_url || '', status: duplicate ? 'draft' : initial?.status || 'draft' });
     const [busy, setBusy] = useState(false), [error, setError] = useState('');
     const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }));
     async function submit(e: React.FormEvent) { e.preventDefault(); setError(''); setBusy(true); try {
