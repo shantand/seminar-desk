@@ -1,7 +1,7 @@
 import { sqliteTable, text, integer, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 export const workspaces = sqliteTable('workspaces', { owner: text('owner').primaryKey(), createdAt: text('created_at').notNull() });
 export const webinars = sqliteTable('webinars', {
-    id: text('id').primaryKey(), owner: text('owner').notNull(), title: text('title').notNull(), course: text('course').notNull(), batch: text('batch').notNull(), description: text('description').notNull(), organizer: text('organizer').notNull(), startsAt: text('starts_at').notNull(), closesAt: text('closes_at').notNull(), joinUrl: text('join_url').notNull(), status: text('status').notNull().default('draft'), createdAt: text('created_at').notNull(), sample: integer('sample').notNull().default(0)
+    id: text('id').primaryKey(), owner: text('owner').notNull(), title: text('title').notNull(), course: text('course').notNull(), batch: text('batch').notNull(), description: text('description').notNull(), organizer: text('organizer').notNull(), startsAt: text('starts_at').notNull(), closesAt: text('closes_at').notNull(), joinUrl: text('join_url').notNull(), status: text('status').notNull().default('draft'), createdAt: text('created_at').notNull(), sample: integer('sample').notNull().default(0), certificate: integer('certificate').notNull().default(0), contactPhone: text('contact_phone').notNull().default('')
 }, t => [index('idx_webinars_owner').on(t.owner)]);
 export const contacts = sqliteTable('contacts', {
     id: text('id').primaryKey(), owner: text('owner').notNull(), phone: text('phone').notNull(), name: text('name').notNull(), doNotContact: integer('do_not_contact').notNull().default(0), sample: integer('sample').notNull().default(0), createdAt: text('created_at').notNull()

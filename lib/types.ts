@@ -12,6 +12,8 @@ export type Webinar = {
     status: 'draft' | 'open' | 'closed';
     created_at: string;
     sample: number;
+    certificate: number;
+    contact_phone: string;
 };
 export type Lead = {
     id: string;

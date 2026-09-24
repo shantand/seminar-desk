@@ -7,7 +7,7 @@ export class AppError extends Error {
 }
 const uid = () => crypto.randomUUID();
 const iso = () => new Date().toISOString();
-export const webinarInput = z.object({ title: z.string().trim().min(3).max(120), course: z.string().trim().min(2).max(80), batch: z.string().trim().min(2).max(80), description: z.string().trim().min(10).max(2000), organizer: z.string().trim().min(2).max(80), starts_at: z.string().datetime(), closes_at: z.string().datetime(), join_url: z.string().url().max(600).refine(x => new URL(x).protocol === 'https:', 'Use a secure https joining link.'), status: z.enum(['draft', 'open', 'closed']) });
+export const webinarInput = z.object({ title: z.string().trim().min(3).max(120), course: z.string().trim().min(2).max(80), batch: z.string().trim().min(2).max(80), description: z.string().trim().min(10).max(2000), organizer: z.string().trim().min(2).max(80), starts_at: z.string().datetime(), closes_at: z.string().datetime(), join_url: z.string().url().max(600).refine(x => new URL(x).protocol === 'https:', 'Use a secure https joining link.'), status: z.enum(['draft', 'open', 'closed']), certificate: z.boolean(), contact_phone: z.string().trim().max(30) });
 export async function getState(owner: string) {
     const db = database();
     const [w, l, a, m] = await Promise.all([
@@ -107,11 +107,11 @@ export async function saveWebinar(owner: string, input: unknown, id?: string) { 
     throw new AppError('Registration must close by the webinar start time.'); if (data.status === 'open' && new Date(data.starts_at) <= new Date())
     throw new AppError('Choose a future date before opening registration.'); const db = database(); if (id) {
     await ownedWebinar(owner, id);
-    await db.prepare('UPDATE webinars SET title=?,course=?,batch=?,description=?,organizer=?,starts_at=?,closes_at=?,join_url=?,status=? WHERE id=? AND owner=?').bind(...Object.values(data), id, owner).run();
+    await db.prepare('UPDATE webinars SET title=?,course=?,batch=?,description=?,organizer=?,starts_at=?,closes_at=?,join_url=?,status=?,certificate=?,contact_phone=? WHERE id=? AND owner=?').bind(data.title, data.course, data.batch, data.description, data.organizer, data.starts_at, data.closes_at, data.join_url, data.status, +data.certificate, data.contact_phone, id, owner).run();
 }
 else {
     id = uid();
-    await db.prepare('INSERT INTO webinars(id,owner,title,course,batch,description,organizer,starts_at,closes_at,join_url,status,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)').bind(id, owner, ...Object.values(data), iso()).run();
+    await db.prepare('INSERT INTO webinars(id,owner,title,course,batch,description,organizer,starts_at,closes_at,join_url,status,certificate,contact_phone,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(id, owner, data.title, data.course, data.batch, data.description, data.organizer, data.starts_at, data.closes_at, data.join_url, data.status, +data.certificate, data.contact_phone, iso()).run();
 } return id; }
 export async function updateLead(owner: string, input: unknown) {
     const d = z.object({ id: z.string(), version: z.number().int().nonnegative(), status: z.enum(STATUSES), next_at: z.string().datetime().nullable(), attendance: z.enum(ATTENDANCE), note: z.string().trim().max(2000), outcome: z.string().trim().max(80), do_not_contact: z.boolean() }).parse(input);
