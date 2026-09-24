@@ -71,6 +71,8 @@ export const ATTENDANCE = ['Unknown', 'Attended', 'Did not attend'] as const;
 export const ZONE = 'Asia/Kolkata';
 export function formatDate(s: string, withTime = true) { return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric', ...(withTime ? { hour: 'numeric' as const, minute: '2-digit' as const } : {}), timeZone: ZONE }).format(new Date(s)); }
 export function dayKey(s: Date | string = new Date()) { return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: ZONE }).format(new Date(s)); }
+export function monthKey(s: string) { return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', timeZone: ZONE }).format(new Date(s)); }
+export function monthLabel(key: string) { const [y, m] = key.split('-').map(Number); return new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric', timeZone: ZONE }).format(new Date(Date.UTC(y, m - 1, 1))); }
 export function inputDate(s: string) { const d = new Date(new Date(s).getTime() + 330 * 60000); return d.toISOString().slice(0, 16); }
 export function fromInput(s: string) { return new Date(s + ':00+05:30').toISOString(); }
 export function initials(s: string) { return s.trim().split(/\s+/).slice(0, 2).map(x => x[0]).join('').toUpperCase(); }
