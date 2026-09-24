@@ -124,10 +124,7 @@ export async function downloadFlyer(w: {
     ctx.arc(W * 0.05, H * 0.98, 220, 0, Math.PI * 2);
     ctx.fill();
 
-    // Wordmark + free badge
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '600 26px Arial, sans-serif';
-    wrapText(ctx, 'CATALIFE TRAINING ORGANISATION', margin, 84, W - margin * 2 - 220, 30, 2);
+    // Free badge
     ctx.font = '700 24px Arial, sans-serif';
     const badge = 'FREE WEBINAR';
     const badgeWidth = ctx.measureText(badge).width + 44;
@@ -180,24 +177,16 @@ export async function downloadFlyer(w: {
     fields.forEach(([label, value], i) => infoRow(ctx, i % 2 === 0 ? col1 : col2, cardY + 62 + Math.floor(i / 2) * 84, label, value));
 
     // QR code + register CTA
-    const qrSize = 210;
+    const qrSize = 230;
     const qrBoxW = qrSize + 32;
-    const qrBoxH = qrSize + 32 + 38;
     const qrY = cardY + cardH + 46;
     const registerUrl = `${location.origin}/register/${w.id}`;
     const qrCanvas = document.createElement('canvas');
     await QRCode.toCanvas(qrCanvas, registerUrl, { width: qrSize, margin: 1, color: { dark: qrDark, light: '#ffffff' } });
     ctx.fillStyle = '#ffffff';
-    roundRect(ctx, margin, qrY, qrBoxW, qrBoxH, 20);
+    roundRect(ctx, margin, qrY, qrBoxW, qrBoxW, 20);
     ctx.fill();
     ctx.drawImage(qrCanvas, margin + 16, qrY + 16, qrSize, qrSize);
-    // A PNG can't carry a real hyperlink, so the address is printed under
-    // the QR code too — it can be read, typed, or copied by hand.
-    ctx.fillStyle = badgeText;
-    ctx.font = '600 16px Arial, sans-serif';
-    ctx.textAlign = 'center';
-    wrapText(ctx, registerUrl.replace(/^https?:\/\//, ''), margin + qrBoxW / 2, qrY + qrSize + 30, qrBoxW - 24, 20, 2);
-    ctx.textAlign = 'left';
 
     const textX = margin + qrBoxW + 40;
     const textWidth = W - margin - textX;
