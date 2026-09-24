@@ -13,6 +13,6 @@ export const activities = sqliteTable('activities', {
     id: text('id').primaryKey(), registrationId: text('registration_id').notNull().references(() => registrations.id), text: text('text').notNull(), outcome: text('outcome').notNull(), createdAt: text('created_at').notNull()
 }, t => [index('idx_activities_registration').on(t.registrationId)]);
 export const messages = sqliteTable('messages', {
-    id: text('id').primaryKey(), registrationId: text('registration_id').notNull().references(() => registrations.id), kind: text('kind').notNull().default('demo_invitation'), body: text('body').notNull(), state: text('state').notNull().default('Simulated'), createdAt: text('created_at').notNull()
+    id: text('id').primaryKey(), registrationId: text('registration_id').notNull().references(() => registrations.id), kind: text('kind').notNull().default('demo_invitation'), body: text('body').notNull(), state: text('state').notNull().default('Simulated'), providerMessageId: text('provider_message_id'), createdAt: text('created_at').notNull()
 }, t => [uniqueIndex('idx_messages_registration_kind').on(t.registrationId, t.kind)]);
 export const rateLimits = sqliteTable('rate_limits', { key: text('key').primaryKey(), count: integer('count').notNull(), expiresAt: integer('expires_at').notNull() });

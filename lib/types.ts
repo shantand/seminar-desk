@@ -34,6 +34,9 @@ export type Lead = {
     course: string;
     batch: string;
     webinar_title: string;
+    webinar_starts_at: string;
+    join_url: string;
+    organizer: string;
     invitation_state: string | null;
     last_note: string | null;
     version: number;
@@ -48,8 +51,10 @@ export type Activity = {
 export type Message = {
     id: string;
     registration_id: string;
+    kind: string;
     body: string;
     state: string;
+    provider_message_id: string | null;
     created_at: string;
 };
 export type DeskState = {
@@ -58,6 +63,7 @@ export type DeskState = {
     activities: Activity[];
     messages: Message[];
     mode: 'demo';
+    whatsapp_configured: boolean;
 };
 export const STATUSES = ['Not contacted', 'Follow-up required', 'Interested', 'Joined course', 'Not interested in this batch'] as const;
 export const SITUATIONS = ['Studying', 'Graduate looking for work', 'Working', 'Other'] as const;

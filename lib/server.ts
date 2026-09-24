@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { database, hash } from './database';
+import { isWhatsAppConfigured, sendTemplateMessage } from './whatsapp';
 import { ATTENDANCE, STATUSES, SITUATIONS, invitation, consentCopy, type Webinar, type Lead, type Activity, type Message } from './types';
 export class AppError extends Error {
     constructor(message: string, public status = 400) { super(message); }
@@ -11,11 +12,11 @@ export async function getState(owner: string) {
     const db = database();
     const [w, l, a, m] = await Promise.all([
         db.prepare('SELECT * FROM webinars WHERE owner=? ORDER BY starts_at DESC').bind(owner).all<Webinar>(),
-        db.prepare(`SELECT r.*,c.phone,c.do_not_contact,c.sample,w.course,w.batch,w.title AS webinar_title,m.state AS invitation_state,(SELECT text FROM activities WHERE registration_id=r.id ORDER BY created_at DESC LIMIT 1) AS last_note FROM registrations r JOIN webinars w ON w.id=r.webinar_id JOIN contacts c ON c.id=r.contact_id LEFT JOIN messages m ON m.registration_id=r.id AND m.kind='demo_invitation' WHERE w.owner=? ORDER BY r.created_at DESC`).bind(owner).all<Lead>(),
+        db.prepare(`SELECT r.*,c.phone,c.do_not_contact,c.sample,w.course,w.batch,w.title AS webinar_title,w.starts_at AS webinar_starts_at,w.join_url,w.organizer,m.state AS invitation_state,(SELECT text FROM activities WHERE registration_id=r.id ORDER BY created_at DESC LIMIT 1) AS last_note FROM registrations r JOIN webinars w ON w.id=r.webinar_id JOIN contacts c ON c.id=r.contact_id LEFT JOIN messages m ON m.registration_id=r.id AND m.kind='demo_invitation' WHERE w.owner=? ORDER BY r.created_at DESC`).bind(owner).all<Lead>(),
         db.prepare('SELECT a.* FROM activities a JOIN registrations r ON a.registration_id=r.id JOIN webinars w ON r.webinar_id=w.id WHERE w.owner=? ORDER BY a.created_at DESC').bind(owner).all<Activity>(),
         db.prepare('SELECT m.* FROM messages m JOIN registrations r ON m.registration_id=r.id JOIN webinars w ON w.id=r.webinar_id WHERE w.owner=? ORDER BY m.created_at DESC').bind(owner).all<Message>()
     ]);
-    return { webinars: w.results, leads: l.results, activities: a.results, messages: m.results, mode: 'demo' as const };
+    return { webinars: w.results, leads: l.results, activities: a.results, messages: m.results, mode: 'demo' as const, whatsapp_configured: isWhatsAppConfigured() };
 }
 export async function ensureWorkspace(owner: string) {
     const db = database();
@@ -125,12 +126,49 @@ export async function updateLead(owner: string, input: unknown) {
     if (!results[2].meta.changes)
         throw new AppError('Another update was saved. Refresh and try again.', 409);
 }
-export async function simulateInvitations(owner: string, input: unknown) { const d = z.object({ webinar_id: z.string(), registration_ids: z.array(z.string()).min(1).max(250) }).parse(input); const w = await ownedWebinar(owner, d.webinar_id); if (w.status !== 'open' || new Date(w.starts_at) <= new Date())
-    throw new AppError('Invitations are available for upcoming, open webinars.'); const db = database(); const rows = await db.prepare('SELECT r.id,r.name FROM registrations r JOIN contacts c ON c.id=r.contact_id WHERE r.webinar_id=? AND r.webinar_consent=1 AND c.do_not_contact=0').bind(w.id).all<{
-    id: string;
-    name: string;
-}>(); const ids = new Set(d.registration_ids); const eligible = rows.results.filter(r => ids.has(r.id)); if (!eligible.length)
-    throw new AppError('No eligible registrations selected.'); const results = await db.batch(eligible.map(r => db.prepare(`INSERT OR IGNORE INTO messages(id,registration_id,kind,body,state,created_at) SELECT ?,r.id,'demo_invitation',?,'Simulated',? FROM registrations r JOIN contacts c ON c.id=r.contact_id WHERE r.id=? AND r.webinar_consent=1 AND c.do_not_contact=0`).bind(uid(), invitation(r.name, w), iso(), r.id))); return results.reduce((n, r) => n + Number(r.meta.changes || 0), 0); }
+export async function simulateInvitations(owner: string, input: unknown) {
+    const d = z.object({ webinar_id: z.string(), registration_ids: z.array(z.string()).min(1).max(250) }).parse(input);
+    const w = await ownedWebinar(owner, d.webinar_id);
+    if (w.status !== 'open' || new Date(w.starts_at) <= new Date())
+        throw new AppError('Invitations are available for upcoming, open webinars.');
+    const db = database();
+    // Registrations that are eligible AND don't already have a demo_invitation row -
+    // the unique index on (registration_id, kind) is what makes re-running this idempotent.
+    const rows = await db.prepare(`SELECT r.id,r.name,c.phone FROM registrations r JOIN contacts c ON c.id=r.contact_id
+        WHERE r.webinar_id=? AND r.webinar_consent=1 AND c.do_not_contact=0
+        AND r.id NOT IN (SELECT registration_id FROM messages WHERE kind='demo_invitation')`).bind(w.id).all<{
+        id: string;
+        name: string;
+        phone: string;
+    }>();
+    const ids = new Set(d.registration_ids);
+    const eligible = rows.results.filter(r => ids.has(r.id));
+    if (!eligible.length)
+        throw new AppError('No eligible registrations selected.');
+
+    if (isWhatsAppConfigured()) {
+        // Real send via the WhatsApp Cloud API. Business-initiated sends outside a
+        // customer's 24h window must use an approved template - until a custom
+        // template exists, this delivers Meta's built-in "hello_world" test content,
+        // not the personalized invitation copy (which is still recorded as `body`
+        // for the lead's own history).
+        let sent = 0;
+        for (const r of eligible) {
+            const result = await sendTemplateMessage(r.phone);
+            const state = result.ok ? 'Sent' : 'Failed';
+            const providerMessageId = result.ok ? result.providerMessageId : null;
+            const outcome = await db.prepare(`INSERT OR IGNORE INTO messages(id,registration_id,kind,body,state,provider_message_id,created_at)
+                SELECT ?,r.id,'demo_invitation',?,?,?,? FROM registrations r JOIN contacts c ON c.id=r.contact_id
+                WHERE r.id=? AND r.webinar_consent=1 AND c.do_not_contact=0`)
+                .bind(uid(), invitation(r.name, w), state, providerMessageId, iso(), r.id).run();
+            if (result.ok) sent += Number(outcome.meta.changes || 0);
+        }
+        return sent;
+    }
+
+    const results = await db.batch(eligible.map(r => db.prepare(`INSERT OR IGNORE INTO messages(id,registration_id,kind,body,state,created_at) SELECT ?,r.id,'demo_invitation',?,'Simulated',? FROM registrations r JOIN contacts c ON c.id=r.contact_id WHERE r.id=? AND r.webinar_consent=1 AND c.do_not_contact=0`).bind(uid(), invitation(r.name, w), iso(), r.id)));
+    return results.reduce((n, r) => n + Number(r.meta.changes || 0), 0);
+}
 export async function publicWebinar(id: string) { return database().prepare('SELECT id,title,course,batch,description,organizer,starts_at,closes_at,status,sample FROM webinars WHERE id=?').bind(id).first<Omit<Webinar, 'owner' | 'join_url'>>(); }
 export async function register(id: string, input: unknown, ip: string) {
     const d = z.object({ name: z.string().trim().min(2).max(100), phone: z.string().transform(x => x.replace(/[\s()-]/g, '')).pipe(z.string().regex(/^\+[1-9]\d{7,14}$/, 'Include your country code, e.g. +91.')), situation: z.enum(SITUATIONS), college: z.string().trim().max(120), study: z.string().trim().max(120), goal: z.string().trim().max(500), webinar_consent: z.boolean(), followup_consent: z.boolean(), website: z.string().max(200).optional() }).parse(input);
