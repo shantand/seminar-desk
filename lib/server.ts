@@ -93,6 +93,16 @@ ${contact}`,
 }
 export async function ownedWebinar(owner: string, id: string) { const w = await database().prepare('SELECT * FROM webinars WHERE id=? AND owner=?').bind(id, owner).first<Webinar>(); if (!w)
     throw new AppError('Webinar not found.', 404); return w; }
+export async function deleteWebinar(owner: string, id: string) {
+    await ownedWebinar(owner, id);
+    const db = database();
+    await db.batch([
+        db.prepare('DELETE FROM messages WHERE registration_id IN (SELECT id FROM registrations WHERE webinar_id=?)').bind(id),
+        db.prepare('DELETE FROM activities WHERE registration_id IN (SELECT id FROM registrations WHERE webinar_id=?)').bind(id),
+        db.prepare('DELETE FROM registrations WHERE webinar_id=?').bind(id),
+        db.prepare('DELETE FROM webinars WHERE id=? AND owner=?').bind(id, owner)
+    ]);
+}
 export async function saveWebinar(owner: string, input: unknown, id?: string) { const data = webinarInput.parse(input); if (new Date(data.closes_at) > new Date(data.starts_at))
     throw new AppError('Registration must close by the webinar start time.'); if (data.status === 'open' && new Date(data.starts_at) <= new Date())
     throw new AppError('Choose a future date before opening registration.'); const db = database(); if (id) {

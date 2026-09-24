@@ -1,5 +1,5 @@
 import { getAdminUser } from '@/lib/auth';
-import { AppError, getState, ensureWorkspace, saveWebinar, updateLead, simulateInvitations } from '@/lib/server';
+import { AppError, getState, ensureWorkspace, saveWebinar, updateLead, simulateInvitations, deleteWebinar } from '@/lib/server';
 import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -39,6 +39,11 @@ export async function POST(request: Request) { try {
             break;
         case 'simulate_invitations':
             result = await simulateInvitations(u.userId, b);
+            break;
+        case 'delete_webinar':
+            if (typeof b.id !== 'string' || !b.id)
+                throw new AppError('Missing webinar id.');
+            await deleteWebinar(u.userId, b.id);
             break;
         default: throw new AppError('Unknown action.');
     }
