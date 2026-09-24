@@ -12,7 +12,8 @@ export default async function SignIn({ searchParams }: { searchParams: Promise<{
             <h1>Seminar Desk</h1>
             <p className="subtitle">Sign in to your workspace.</p>
             <label>Password<input type="password" name="password" required autoFocus minLength={1} maxLength={200}/></label>
-            {error && <p className="form-error" role="alert">That password didn&apos;t match. Try again.</p>}
+            {error === 'rate' && <p className="form-error" role="alert">Too many attempts. Please wait a minute and try again.</p>}
+            {error && error !== 'rate' && <p className="form-error" role="alert">That password didn&apos;t match. Try again.</p>}
             <button className="primary-button" type="submit">Sign in</button>
         </form>
     </div>;
