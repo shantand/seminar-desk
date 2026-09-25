@@ -6,10 +6,11 @@ import { formatDate } from './types';
 // browser (Canvas API) and triggers a download. The flyer embeds a QR
 // code that links straight to the registration form, so it works as a
 // WhatsApp / Instagram / print share without anyone having to type a
-// link. Nothing is uploaded or posted anywhere.
+// link. Nothing is uploaded or posted anywhere. Canvas height is
+// computed from the actual title/description content, so nothing gets
+// truncated — a longer theme just makes a taller flyer.
 
 const W = 1080;
-const H = 1350;
 
 export const FLYER_COLORS = ['#0B3D2E', '#A8436B', '#1B3A6B', '#6B1B2B', '#26272B', '#4B2168'] as const;
 const DEFAULT_COLOR = FLYER_COLORS[0];
@@ -46,8 +47,9 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 }
 
 // Wraps text to fit maxWidth, draws up to maxLines, ellipsizing the last
-// line if there's more text than fits. Returns the y position after the
-// last drawn line so callers can lay out what comes next.
+// line if there's more text than fits. Used only for the app's own short,
+// fixed CTA copy — never for the webinar's own title/theme, which must
+// never be cut off.
 function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number, maxLines: number): number {
     const words = text.split(' ');
     const lines: string[] = [];
@@ -76,6 +78,39 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: num
     return y + lines.length * lineHeight;
 }
 
+// Wraps text to fit maxWidth with no line cap and no truncation, so the
+// webinar's own title and theme always render in full. Respects blank
+// lines and manual line breaks the organizer typed in (\n), instead of
+// collapsing everything into one paragraph.
+function wrapAll(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+    const lines: string[] = [];
+    for (const para of text.split('\n')) {
+        if (para.trim() === '') {
+            lines.push('');
+            continue;
+        }
+        let current = '';
+        for (const word of para.split(' ')) {
+            const test = current ? `${current} ${word}` : word;
+            if (ctx.measureText(test).width > maxWidth && current) {
+                lines.push(current);
+                current = word;
+            }
+            else {
+                current = test;
+            }
+        }
+        if (current)
+            lines.push(current);
+    }
+    return lines;
+}
+
+function drawLines(ctx: CanvasRenderingContext2D, lines: string[], x: number, y: number, lineHeight: number): number {
+    lines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
+    return y + lines.length * lineHeight;
+}
+
 function infoRow(ctx: CanvasRenderingContext2D, x: number, y: number, label: string, value: string) {
     ctx.font = '600 22px Arial, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.65)';
@@ -97,6 +132,45 @@ export async function downloadFlyer(w: {
     certificate: number;
     contact_phone: string;
 }, color: string = DEFAULT_COLOR) {
+    // A throwaway context, just to measure how many lines the title and
+    // description will need before the real canvas is sized — font
+    // metrics don't depend on canvas dimensions, so this is accurate.
+    const measurer = document.createElement('canvas').getContext('2d');
+    if (!measurer)
+        throw new Error('Your browser does not support generating images here.');
+
+    const margin = 72;
+    const titleFont = '700 54px Arial, sans-serif';
+    const titleLineHeight = 62;
+    const descFont = '400 26px Arial, sans-serif';
+    const descLineHeight = 36;
+
+    measurer.font = titleFont;
+    const titleLines = wrapAll(measurer, w.title, W - margin * 2);
+    measurer.font = descFont;
+    const descLines = wrapAll(measurer, w.description, W - margin * 2);
+
+    const titleY = 280;
+    const afterTitleY = titleY + titleLines.length * titleLineHeight;
+    const afterDescY = afterTitleY + 44 + descLines.length * descLineHeight;
+
+    const fields: [string, string][] = [
+        ['Date', formatDate(w.starts_at, false)],
+        ['Time', new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }).format(new Date(w.starts_at)) + ' IST'],
+        ['Mode', 'Online — Live Session'],
+    ];
+    if (w.certificate)
+        fields.push(['Certificate', 'Yes, e-certificate']);
+    const cardY = afterDescY + 50;
+    const rows = Math.ceil(fields.length / 2);
+    const cardH = rows === 1 ? 106 : 190;
+
+    const qrSize = 230;
+    const qrBoxW = qrSize + 32;
+    const qrY = cardY + cardH + 46;
+    const footerY = qrY + qrBoxW + 90;
+    const H = footerY + 70;
+
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
@@ -104,7 +178,6 @@ export async function downloadFlyer(w: {
     if (!ctx)
         throw new Error('Your browser does not support generating images here.');
 
-    const margin = 72;
     const badgeTint = shade(color, 0.88);
     const badgeText = shade(color, -0.45);
     const linkTint = shade(color, 0.6);
@@ -146,29 +219,20 @@ export async function downloadFlyer(w: {
     ctx.fillStyle = '#ffffff';
     ctx.fillText(courseLabel, margin + 22, 182);
 
-    // Title
+    // Title — drawn in full, using the same wrapping computed above
     ctx.fillStyle = '#ffffff';
-    ctx.font = '700 54px Arial, sans-serif';
-    const afterTitleY = wrapText(ctx, w.title, margin, 280, W - margin * 2, 62, 3);
+    ctx.font = titleFont;
+    drawLines(ctx, titleLines, margin, titleY, titleLineHeight);
 
-    // Theme / description
-    ctx.font = '400 26px Arial, sans-serif';
+    // Theme / description — drawn in full, preserving the organizer's own
+    // line breaks and blank lines
+    ctx.font = descFont;
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    const afterDescY = wrapText(ctx, w.description, margin, afterTitleY + 44, W - margin * 2, 36, 3);
+    drawLines(ctx, descLines, margin, afterTitleY + 44, descLineHeight);
 
     // Info card — only fields that actually have a value are shown, so a
     // webinar with no certificate simply omits that row instead of saying
     // "Not provided".
-    const fields: [string, string][] = [
-        ['Date', formatDate(w.starts_at, false)],
-        ['Time', new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Kolkata' }).format(new Date(w.starts_at)) + ' IST'],
-        ['Mode', 'Online — Live Session'],
-    ];
-    if (w.certificate)
-        fields.push(['Certificate', 'Yes, e-certificate']);
-    const cardY = afterDescY + 50;
-    const rows = Math.ceil(fields.length / 2);
-    const cardH = rows === 1 ? 106 : 190;
     ctx.fillStyle = 'rgba(255,255,255,0.10)';
     roundRect(ctx, margin, cardY, W - margin * 2, cardH, 20);
     ctx.fill();
@@ -177,9 +241,6 @@ export async function downloadFlyer(w: {
     fields.forEach(([label, value], i) => infoRow(ctx, i % 2 === 0 ? col1 : col2, cardY + 62 + Math.floor(i / 2) * 84, label, value));
 
     // QR code + register CTA
-    const qrSize = 230;
-    const qrBoxW = qrSize + 32;
-    const qrY = cardY + cardH + 46;
     const registerUrl = `${location.origin}/register/${w.id}`;
     const qrCanvas = document.createElement('canvas');
     await QRCode.toCanvas(qrCanvas, registerUrl, { width: qrSize, margin: 1, color: { dark: qrDark, light: '#ffffff' } });
@@ -198,7 +259,6 @@ export async function downloadFlyer(w: {
     wrapText(ctx, 'Seats are limited — reserve your spot now.', textX, qrY + 126, textWidth, 34, 3);
 
     // Footer: organizer + contact, with the Seminar Desk credit below
-    const footerY = H - 76;
     ctx.strokeStyle = 'rgba(255,255,255,0.25)';
     ctx.beginPath();
     ctx.moveTo(margin, footerY - 34);
