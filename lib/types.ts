@@ -23,7 +23,8 @@ export type Lead = {
     phone: string;
     situation: string;
     college: string;
-    study: string;
+    city: string;
+    email: string;
     goal: string;
     webinar_consent: number;
     followup_consent: number;

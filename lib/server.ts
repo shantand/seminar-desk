@@ -18,6 +18,23 @@ export async function getState(owner: string) {
     ]);
     return { webinars: w.results, leads: l.results, activities: a.results, messages: m.results, mode: 'demo' as const, whatsapp_configured: isWhatsAppConfigured() };
 }
+export async function leadsForExport(owner: string) {
+    const db = database();
+    const r = await db.prepare(`SELECT r.name,c.phone,r.email,r.college,r.city,r.situation,w.course,w.batch,w.title AS webinar_title,w.starts_at AS webinar_starts_at,r.created_at FROM registrations r JOIN webinars w ON w.id=r.webinar_id JOIN contacts c ON c.id=r.contact_id WHERE w.owner=? AND w.sample=0 AND c.sample=0 ORDER BY r.created_at DESC`).bind(owner).all<{
+        name: string;
+        phone: string;
+        email: string;
+        college: string;
+        city: string;
+        situation: string;
+        course: string;
+        batch: string;
+        webinar_title: string;
+        webinar_starts_at: string;
+        created_at: string;
+    }>();
+    return r.results;
+}
 export async function ensureWorkspace(owner: string) {
     const db = database();
     const existing = await db.prepare('SELECT owner FROM workspaces WHERE owner=?').bind(owner).first();
@@ -181,7 +198,7 @@ export async function simulateInvitations(owner: string, input: unknown) {
 }
 export async function publicWebinar(id: string) { return database().prepare('SELECT id,title,course,batch,description,organizer,starts_at,closes_at,status,sample FROM webinars WHERE id=?').bind(id).first<Omit<Webinar, 'owner' | 'join_url'>>(); }
 export async function register(id: string, input: unknown, ip: string) {
-    const d = z.object({ name: z.string().trim().min(2).max(100), phone: z.string().transform(x => x.replace(/[\s()-]/g, '')).pipe(z.string().regex(/^\+[1-9]\d{7,14}$/, 'Include your country code, e.g. +91.')), situation: z.enum(SITUATIONS), college: z.string().trim().max(120), study: z.string().trim().max(120), goal: z.string().trim().max(500), webinar_consent: z.boolean(), followup_consent: z.boolean(), website: z.string().max(200).optional() }).parse(input);
+    const d = z.object({ name: z.string().trim().min(2).max(100), phone: z.string().transform(x => x.replace(/[\s()-]/g, '')).pipe(z.string().regex(/^\+[1-9]\d{7,14}$/, 'Include your country code, e.g. +91.')), email: z.string().trim().min(3).max(160).email('Enter a valid email address.'), situation: z.enum(SITUATIONS), college: z.string().trim().min(2, 'Enter your college or institution.').max(120), city: z.string().trim().min(2, 'Enter your city.').max(120), goal: z.string().trim().max(500), webinar_consent: z.boolean(), followup_consent: z.boolean(), website: z.string().max(200).optional() }).parse(input);
     if (d.website)
         return;
     const db = database();
@@ -198,5 +215,5 @@ export async function register(id: string, input: unknown, ip: string) {
     await db.prepare('DELETE FROM rate_limits WHERE expires_at < ?').bind(Date.now()).run();
     const now = iso(), cid = uid(), rid = uid();
     const consent = consentCopy(w.organizer);
-    await db.batch([db.prepare('INSERT OR IGNORE INTO contacts(id,owner,phone,name,created_at) VALUES(?,?,?,?,?)').bind(cid, w.owner, d.phone, d.name, now), db.prepare(`INSERT OR IGNORE INTO registrations(id,webinar_id,contact_id,name,situation,college,study,goal,webinar_consent,followup_consent,consent_text,consent_at,created_at) SELECT ?,?,c.id,?,?,?,?,?,?,?,?,?,? FROM contacts c WHERE c.owner=? AND c.phone=? AND EXISTS(SELECT 1 FROM webinars WHERE id=? AND status='open' AND closes_at>?)`).bind(rid, id, d.name, d.situation, d.college, d.study, d.goal, +d.webinar_consent, +d.followup_consent, JSON.stringify(consent), now, now, w.owner, d.phone, id, now)]);
+    await db.batch([db.prepare('INSERT OR IGNORE INTO contacts(id,owner,phone,name,created_at) VALUES(?,?,?,?,?)').bind(cid, w.owner, d.phone, d.name, now), db.prepare(`INSERT OR IGNORE INTO registrations(id,webinar_id,contact_id,name,situation,college,city,email,goal,webinar_consent,followup_consent,consent_text,consent_at,created_at) SELECT ?,?,c.id,?,?,?,?,?,?,?,?,?,?,? FROM contacts c WHERE c.owner=? AND c.phone=? AND EXISTS(SELECT 1 FROM webinars WHERE id=? AND status='open' AND closes_at>?)`).bind(rid, id, d.name, d.situation, d.college, d.city, d.email, d.goal, +d.webinar_consent, +d.followup_consent, JSON.stringify(consent), now, now, w.owner, d.phone, id, now)]);
 }
