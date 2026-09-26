@@ -12,7 +12,10 @@
     "start": "node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js dev --config dist/server/wrangler.json --local --persist-to .wrangler/state --ip 127.0.0.1 --inspector-port 0",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
-    "deploy": "node -e \"if(!process.env.D1_DATABASE_ID){console.error('Set D1_DATABASE_ID first, e.g. export D1_DATABASE_ID=<your-uuid> (see README).');process.exit(1)}\" && npm run build && wrangler deploy --config dist/server/wrangler.json"
+    "deploy": "node -e \"if(!process.env.D1_DATABASE_ID){console.error('Set D1_DATABASE_ID first, e.g. export D1_DATABASE_ID=<your-uuid> (see README).');process.exit(1)}\" && npm run build && wrangler deploy --config dist/server/wrangler.json",
+    "verify:sql": "node scripts/verify-sql-bindings.mjs",
+    "verify:schema": "node scripts/verify-schema.mjs",
+    "verify": "npm run verify:sql && npm run verify:schema"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

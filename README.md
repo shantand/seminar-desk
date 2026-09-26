@@ -52,6 +52,30 @@ The integration script needs Playwright and a compatible Chromium binary. Set `P
 
 Checks cover browser flows, phone layout, history, authenticated API access, duplicate registration, safe URLs, callback validation, stale writes, concurrent invitation triggers, opt-outs, closed webinars, and persistence after reload.
 
+## Safety checks before committing a schema change
+
+Schema, migrations, and TypeScript types are hand-maintained in four
+separate places (`db/schema.ts`, `drizzle/*.sql`, `drizzle/meta/*_snapshot.json`,
+`lib/types.ts`) — nothing enforces they stay in sync automatically. Two
+scripts guard against the two most common ways that drifts apart:
+
+- `npm run verify:schema` — replays every migration against a throwaway
+  local D1 database (no network or account needed) and cross-checks the
+  result against `db/schema.ts` and the latest snapshot. Catches a
+  renamed/added column that only made it into one of the three places,
+  or a migration file with broken SQL, before it ever reaches production.
+- `npm run verify:sql` — a static scan of every `db.prepare(...).bind(...)`
+  call in `lib/server.ts` and the API routes, flagging any place where the
+  number of `?` placeholders doesn't match the number of bound arguments.
+
+Run both (or `npm run verify`, which runs them together) before
+committing any change that touches `db/schema.ts`, `drizzle/`, or a
+`db.prepare(...)` call. Neither script touches your real database. It's
+worth also running `npm run lint` and `npx tsc --noEmit` on any files
+you touch — the repo has a few pre-existing lint findings elsewhere
+that aren't part of this gate, so a clean `npm run verify` doesn't
+imply a clean full-repo lint.
+
 ## Real WhatsApp integration later
 
 1. Configure an official Meta Cloud API test sender and verify the allowed demo recipients.
