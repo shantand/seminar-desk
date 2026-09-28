@@ -1,15 +1,21 @@
-import { env } from 'cloudflare:workers';
 import { FEATURE_FLAG_DEFS, type FeatureFlags } from './types';
 
 // Deployment-level feature flags. Unlike a per-admin database setting,
-// these are set once per Cloudflare Worker deployment via a wrangler
-// var (or `wrangler secret put` if you'd rather not have the value
-// visible in wrangler.toml / the dashboard) and read fresh on every
-// request - there is no admin UI to flip them. Changing one means
-// editing the var for that deployment and running `npm run deploy`
-// again, which is the point: different self-hosted instances can ship
-// with different defaults, but nobody signed in to one instance can
-// toggle it for everyone else.
+// these are set once per deployment via an env var (a Cloudflare
+// Worker `var`/secret, a `.env` file, a Docker `-e`, a host's
+// dashboard env-var setting - whatever the target platform calls it)
+// and read fresh on every request via process.env - there is no admin
+// UI to flip them. Changing one means editing the var for that
+// deployment and redeploying, which is the point: different
+// self-hosted instances can ship with different defaults, but nobody
+// signed in to one instance can toggle it for everyone else.
+//
+// Reads process.env rather than Cloudflare's `cloudflare:workers` env
+// import so this file has no Cloudflare-specific dependency. On this
+// project's Cloudflare deployment, process.env is populated from the
+// Worker's configured vars/secrets because the `nodejs_compat`
+// compatibility flag is enabled (see wrangler.json); on any other
+// Node-compatible host, process.env works the normal way.
 //
 // Env var name is FEATURE_<KEY_UPPERCASED>, e.g. the flag
 // "registrations_table_view" reads FEATURE_REGISTRATIONS_TABLE_VIEW.
@@ -28,7 +34,7 @@ export function getDeploymentFlags(): FeatureFlags {
     const flags = {} as FeatureFlags;
     for (const def of FEATURE_FLAG_DEFS) {
         const envKey = `FEATURE_${def.key.toUpperCase()}`;
-        const override = parseFlagVar((env as unknown as Record<string, string | undefined>)[envKey]);
+        const override = parseFlagVar(process.env[envKey]);
         flags[def.key] = override !== undefined ? override : def.default;
     }
     return flags;
