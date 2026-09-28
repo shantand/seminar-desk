@@ -60,6 +60,11 @@ export type Message = {
     provider_message_id: string | null;
     created_at: string;
 };
+export const FEATURE_FLAG_DEFS = [
+    { key: 'registrations_table_view', label: 'Registrations table view', description: 'Show the Registrations tab as an Excel-style table instead of cards. Turn off to go back to the card layout.', default: true }
+] as const;
+export type FeatureFlagKey = typeof FEATURE_FLAG_DEFS[number]['key'];
+export type FeatureFlags = Record<FeatureFlagKey, boolean>;
 export type DeskState = {
     webinars: Webinar[];
     leads: Lead[];
@@ -67,6 +72,7 @@ export type DeskState = {
     messages: Message[];
     mode: 'demo';
     whatsapp_configured: boolean;
+    flags: FeatureFlags;
 };
 export const STATUSES = ['Not contacted', 'Follow-up required', 'Interested', 'Joined course', 'Not interested in this batch'] as const;
 export const SITUATIONS = ['Studying', 'Graduate looking for work', 'Working', 'Other'] as const;

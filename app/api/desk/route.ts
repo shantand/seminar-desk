@@ -1,5 +1,5 @@
 import { getAdminUser } from '@/lib/auth';
-import { AppError, getState, ensureWorkspace, saveWebinar, updateLead, simulateInvitations, deleteWebinar } from '@/lib/server';
+import { AppError, getState, ensureWorkspace, saveWebinar, updateLead, simulateInvitations, deleteWebinar, setFeatureFlag } from '@/lib/server';
 import { z } from 'zod';
 export const dynamic = 'force-dynamic';
 const json = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -44,6 +44,11 @@ export async function POST(request: Request) { try {
             if (typeof b.id !== 'string' || !b.id)
                 throw new AppError('Missing webinar id.');
             await deleteWebinar(u.userId, b.id);
+            break;
+        case 'set_flag':
+            if (typeof b.key !== 'string' || typeof b.enabled !== 'boolean')
+                throw new AppError('Missing flag key or enabled value.');
+            await setFeatureFlag(u.userId, b.key, b.enabled);
             break;
         default: throw new AppError('Unknown action.');
     }

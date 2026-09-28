@@ -1,22 +1,39 @@
 import { z } from 'zod';
 import { database, hash } from './database';
 import { isWhatsAppConfigured, sendTemplateMessage } from './whatsapp';
-import { ATTENDANCE, STATUSES, SITUATIONS, invitation, consentCopy, type Webinar, type Lead, type Activity, type Message } from './types';
+import { ATTENDANCE, STATUSES, SITUATIONS, FEATURE_FLAG_DEFS, invitation, consentCopy, type Webinar, type Lead, type Activity, type Message, type FeatureFlags, type FeatureFlagKey } from './types';
 export class AppError extends Error {
     constructor(message: string, public status = 400) { super(message); }
 }
 const uid = () => crypto.randomUUID();
 const iso = () => new Date().toISOString();
 export const webinarInput = z.object({ title: z.string().trim().min(3).max(120), course: z.string().trim().min(2).max(80), batch: z.string().trim().min(2).max(80), description: z.string().trim().min(10).max(2000), organizer: z.string().trim().min(2).max(80), starts_at: z.string().datetime(), closes_at: z.string().datetime(), join_url: z.string().url().max(600).refine(x => new URL(x).protocol === 'https:', 'Use a secure https joining link.'), status: z.enum(['draft', 'open', 'closed']), certificate: z.boolean(), contact_phone: z.string().trim().max(30) });
+export async function getFeatureFlags(owner: string): Promise<FeatureFlags> {
+    const db = database();
+    const rows = await db.prepare('SELECT key,enabled FROM feature_flags WHERE owner=?').bind(owner).all<{
+        key: string;
+        enabled: number;
+    }>();
+    const overrides = new Map(rows.results.map(r => [r.key, !!r.enabled]));
+    const flags = {} as FeatureFlags;
+    for (const def of FEATURE_FLAG_DEFS) flags[def.key] = overrides.has(def.key) ? overrides.get(def.key)! : def.default;
+    return flags;
+}
+export async function setFeatureFlag(owner: string, key: string, enabled: boolean) {
+    if (!FEATURE_FLAG_DEFS.some(d => d.key === key)) throw new AppError('Unknown feature flag.');
+    const db = database();
+    await db.prepare('INSERT INTO feature_flags(owner,key,enabled,updated_at) VALUES(?,?,?,?) ON CONFLICT(owner,key) DO UPDATE SET enabled=excluded.enabled,updated_at=excluded.updated_at').bind(owner, key as FeatureFlagKey, +enabled, iso()).run();
+}
 export async function getState(owner: string) {
     const db = database();
-    const [w, l, a, m] = await Promise.all([
+    const [w, l, a, m, flags] = await Promise.all([
         db.prepare('SELECT * FROM webinars WHERE owner=? ORDER BY starts_at DESC').bind(owner).all<Webinar>(),
         db.prepare(`SELECT r.*,c.phone,c.do_not_contact,c.sample,w.course,w.batch,w.title AS webinar_title,w.starts_at AS webinar_starts_at,w.join_url,w.organizer,m.state AS invitation_state,(SELECT text FROM activities WHERE registration_id=r.id ORDER BY created_at DESC LIMIT 1) AS last_note FROM registrations r JOIN webinars w ON w.id=r.webinar_id JOIN contacts c ON c.id=r.contact_id LEFT JOIN messages m ON m.registration_id=r.id AND m.kind='demo_invitation' WHERE w.owner=? ORDER BY r.created_at DESC`).bind(owner).all<Lead>(),
         db.prepare('SELECT a.* FROM activities a JOIN registrations r ON a.registration_id=r.id JOIN webinars w ON r.webinar_id=w.id WHERE w.owner=? ORDER BY a.created_at DESC').bind(owner).all<Activity>(),
-        db.prepare('SELECT m.* FROM messages m JOIN registrations r ON m.registration_id=r.id JOIN webinars w ON w.id=r.webinar_id WHERE w.owner=? ORDER BY m.created_at DESC').bind(owner).all<Message>()
+        db.prepare('SELECT m.* FROM messages m JOIN registrations r ON m.registration_id=r.id JOIN webinars w ON w.id=r.webinar_id WHERE w.owner=? ORDER BY m.created_at DESC').bind(owner).all<Message>(),
+        getFeatureFlags(owner)
     ]);
-    return { webinars: w.results, leads: l.results, activities: a.results, messages: m.results, mode: 'demo' as const, whatsapp_configured: isWhatsAppConfigured() };
+    return { webinars: w.results, leads: l.results, activities: a.results, messages: m.results, mode: 'demo' as const, whatsapp_configured: isWhatsAppConfigured(), flags };
 }
 export async function leadsForExport(owner: string) {
     const db = database();
