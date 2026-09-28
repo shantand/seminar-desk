@@ -14,9 +14,10 @@
 // Run: node scripts/verify-sql-bindings.mjs  (or `npm run verify:sql`)
 
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const FILES = ['lib/server.ts', 'app/api/auth/signin/route.ts', 'app/api/whatsapp/webhook/route.ts'];
 
 let failed = false;
