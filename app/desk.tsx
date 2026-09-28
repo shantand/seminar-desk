@@ -8,7 +8,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
@@ -162,13 +161,7 @@ export default function Desk({ displayName = 'Your workspace' }: {
  <Sheet open={!!selected} onOpenChange={o => { if (!o)
         setSelectedId(null); }}><SheetContent className="contact-sheet">{selected && <ContactDetail key={selected.id} lead={selected} data={data} mutate={mutate} close={() => setSelectedId(null)}/>}</SheetContent></Sheet>
  {invitedWebinar && <InvitationDialog webinar={invitedWebinar} data={data} mutate={mutate} close={() => setInviteId(null)}/>}
- <Dialog open={showInfo} onOpenChange={setShowInfo}><DialogContent className="app-dialog account-dialog"><DialogHeader><div className="account-avatar">{initials(displayName)}</div><DialogTitle>{displayName}</DialogTitle><DialogDescription>Signed in</DialogDescription></DialogHeader><div className="info-box"><Smartphone /><div><h3>Keep it on your home screen</h3><p>On iPhone, open this site in Safari, tap Share, then Add to Home Screen. On Android, use your browser's Install app or Add to Home screen option. An internet connection is required.</p>{installPrompt && <Button onClick={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}>Install app</Button>}</div></div><div className="flags-section"><h3><Settings2 size={16}/>Feature flags</h3>{FEATURE_FLAG_DEFS.map(f => <label key={f.key} className="flag-row"><span><strong>{f.label}</strong><span className="helper">{f.description}</span></span><Switch checked={data.flags[f.key]} onCheckedChange={async v => { try {
-        await mutate({ action: 'set_flag', key: f.key, enabled: v });
-        toast.success(`${f.label} ${v ? 'enabled' : 'disabled'}.`);
-    }
-    catch (e) {
-        toast.error(e instanceof Error ? e.message : 'Could not update this setting.');
-    } }}/></label>)}</div><Button variant="outline" onClick={() => { setShowInfo(false); tour.start(); }}><Sun size={16}/>Take the tour</Button><form method="post" action="/api/auth/signout"><input type="hidden" name="return_to" value="/"/><button type="submit" className="signout"><LogOut size={16}/>Sign out</button></form></DialogContent></Dialog>
+ <Dialog open={showInfo} onOpenChange={setShowInfo}><DialogContent className="app-dialog account-dialog"><DialogHeader><div className="account-avatar">{initials(displayName)}</div><DialogTitle>{displayName}</DialogTitle><DialogDescription>Signed in</DialogDescription></DialogHeader><div className="info-box"><Smartphone /><div><h3>Keep it on your home screen</h3><p>On iPhone, open this site in Safari, tap Share, then Add to Home Screen. On Android, use your browser's Install app or Add to Home screen option. An internet connection is required.</p>{installPrompt && <Button onClick={async () => { await installPrompt.prompt(); setInstallPrompt(null); }}>Install app</Button>}</div></div><Button variant="outline" onClick={() => { setShowInfo(false); tour.start(); }}><Sun size={16}/>Take the tour</Button><form method="post" action="/api/auth/signout"><input type="hidden" name="return_to" value="/"/><button type="submit" className="signout"><LogOut size={16}/>Sign out</button></form></DialogContent></Dialog>
  <OnboardingTour active={tour.active} step={tour.step} setStep={tour.setStep} finish={tour.finish}/>
  </div></TooltipProvider>;
 }

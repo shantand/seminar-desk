@@ -10,5 +10,6 @@ declare namespace Cloudflare {
     WHATSAPP_VERIFY_TOKEN?: string;
     WHATSAPP_TEMPLATE_NAME?: string;
     WHATSAPP_TEMPLATE_LANG?: string;
+    FEATURE_REGISTRATIONS_TABLE_VIEW?: string;
   }
 }

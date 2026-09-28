@@ -91,6 +91,21 @@ Schema is in `db/schema.ts`; generated migrations are in `drizzle/`. Runtime cod
 
 D1 has ~30 days of built-in point-in-time recovery, but there is no separate backup-export job in this MVP; run `wrangler d1 export DB --remote --output backup.sql` periodically (e.g. from cron) before relying on this for real participant data. Users requesting correction or deletion should contact the organizer; an operator-facing deletion workflow can be added before a public pilot.
 
+## Feature flags (per deployment)
+
+Some features can be switched on or off per deployment without touching code, via lib/flags.ts and the FEATURE_FLAG_DEFS registry in lib/types.ts. These are deployment-level, not admin-level: there is no in-app toggle, and changing one means updating the Worker var and redeploying that specific instance. This is intentional if you run more than one deployment (e.g. one per customer) and want each to ship with its own defaults, without giving any signed-in admin a switch that affects everyone.
+
+Each flag reads from an env var named `FEATURE_<KEY_UPPERCASED>` (e.g. the "registrations_table_view" flag reads `FEATURE_REGISTRATIONS_TABLE_VIEW`), accepting `1`/`0`, `true`/`false`, `on`/`off`, or `yes`/`no` (case-insensitive). If the var is unset, the flag's built-in default in `FEATURE_FLAG_DEFS` applies.
+
+To turn a flag off for one deployment:
+```
+wrangler secret put FEATURE_REGISTRATIONS_TABLE_VIEW   # or use a plain wrangler var if it doesn't need to be secret
+# enter: false
+npm run deploy
+```
+
+To add a new flag: add an entry to `FEATURE_FLAG_DEFS` in `lib/types.ts` (key, label, description, default), add its type to `cloudflare-env.d.ts`, and read `flags.<key>` from `DeskState` wherever it should gate behavior — `getDeploymentFlags()` in `lib/flags.ts` picks it up automatically.
+
 ## Deploying your own instance
 
 This runs as a Cloudflare Worker with a D1 database, in your own Cloudflare account — not through any third-party hosting layer.
