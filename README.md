@@ -12,7 +12,12 @@ Client was using the free webinars for collecting the data of potential sales pr
 5. Post this webinar there needs to be follow up done for all the interested candidate ( Sales - lead generation)
 6. Sometimes multiple follow ups was needed to convince the participant about how will it benefit them.
 
-## Solutions built ( With Claude & Cursor only. Using CloudFlares free hosting)
+## Solution Proposed
+- Only using AI tools (Claude, cursor) build a solution to collect data and manage notification. Iterate fasst.
+- Can be accessed anywhere mobile or web
+- Hosted with minimal to no cost
+- Followups communication can be managed through easier user interface.
+- Automated way to generate flyers and one click process to send notifications over whatsapp.
 
 ## Seminar Desk
 1. Solution built with typescript(next.js) and database is D1 which cloudflare specific.
@@ -25,10 +30,7 @@ Client was using the free webinars for collecting the data of potential sales pr
 
 
 
-
-
-
-## AI Generated
+## AI Generated Content
 <details>
 <summary>Click to expand</summary>
 
