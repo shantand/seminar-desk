@@ -1,5 +1,39 @@
 # Seminar Desk
 
+This is the app built to solve real-world workflow problem of data collection and management.
+
+Client was using the free webinars for collecting the data of potential sales prospects that may be interested in buying course online.
+
+## Requirements Gathering
+1. Webinar date-time is fixed with the guest panel or with internal team working on course content preparation
+2. Flyer is generated, along with registration form for people to show their interest.  **Data Collection**
+3. Once all the candidates posted their data, whats app message for meeting link usually (Google Meet) link is shared.
+4. All interested participant could join the seminar and ask questions with expert panel or course instructor. Fees and Schedule is conveyed in the same session
+5. Post this webinar there needs to be follow up done for all the interested candidate ( Sales - lead generation)
+6. Sometimes multiple follow ups was needed to convince the participant about how will it benefit them.
+
+## Solutions built ( With Claude & Cursor only. Using CloudFlares free hosting)
+
+## Seminar Desk
+1. Solution built with typescript(next.js) and database is D1 which cloudflare specific.
+2. same stack can be run easily for any other tenant with different deployment id. Exact steps added in depployment.pdf
+3. Automatically generates Flyer for the course based on the content used to create webinar.
+4. One clikc Personalised Whatsapp messages with seminar links to attend. ( This needs to be automated so bult messages can be sent)
+5. Same interface can be accessed from mobile or web.
+6. After seminar the followup conversations can be recorded with notes. 
+
+
+
+
+
+
+
+## AI Generated
+<details>
+<summary>Click to expand</summary>
+
+Your hidden content goes here.
+
 A mobile-first, persistent MVP for recurring webinar registrations and course follow-ups. Built with React/Vinext, Cloudflare Workers, and D1. All invitation sending is explicitly simulated; no WhatsApp account, token, or real messaging provider is configured.
 
 ## Included
@@ -115,3 +149,5 @@ This runs as a Cloudflare Worker with a D1 database, in your own Cloudflare acco
 3. Set two Worker secrets: `wrangler secret put ADMIN_PASSWORD` and `wrangler secret put SESSION_SECRET` (a long random string for the second one, e.g. `openssl rand -hex 32`).
 4. Build with `D1_DATABASE_ID=<id> npm run build`, then `wrangler deploy` (pointing at the built worker's generated config, or your own `wrangler.toml` with the same `DB` binding).
 5. Visit your `*.workers.dev` URL (or a custom domain you attach in the Cloudflare dashboard) and sign in at `/signin` with the password from step 3. The app is installable from there on any phone or desktop browser (Add to Home Screen) — no separate app build is needed.
+
+</details>
