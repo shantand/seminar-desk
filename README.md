@@ -6,10 +6,10 @@ Client was using the free webinars for collecting the data of potential sales pr
 
 ## Requirements Gathering
 1. Webinar date-time is fixed with the guest panel or with internal team working on course content preparation
-2. Flyer is generated, along with registration form for people to show their interest.  **Data Collection**
-3. Once all the candidates posted their data, whats app message for meeting link usually (Google Meet) link is shared.
+2. Flyer is generated, along with registration form for people to show their interest. circulated through whatsapp and instagram by peer-to-peer network.  **Data Collection**
+3. Once all the candidates fill the registration forms, They receive whats app message for meeting link usually (Google Meet).
 4. All interested participant could join the seminar and ask questions with expert panel or course instructor. Fees and Schedule is conveyed in the same session
-5. Post this webinar there needs to be follow up done for all the interested candidate ( Sales - lead generation)
+5. Post this webinar there needs to be follow up done for all the interested candidate (**Sales - lead generation**)
 6. Sometimes multiple follow ups was needed to convince the participant about how will it benefit them.
 
 ## Solution Proposed
